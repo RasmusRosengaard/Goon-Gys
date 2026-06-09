@@ -1,0 +1,24 @@
+.env
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Background clips are large local INPUTS (GitHub rejects files >100MB). Keep the folder
+# skeleton (its .gitignore placeholders), ignore the actual media.
+background_videos/**/*.mp4
+background_videos/**/*.mov
+background_videos/**/*.mkv
+background_videos/**/*.webm
+
+# Pipeline intermediates — regenerated every render. Keep the folder, ignore contents.
+build/*
+!build/.gitkeep
+
+# Generated stories — keep only the template.
+Stories/*.md
+!Stories/template.md
+
+# Generated video outputs — keep only the template folder.
+Ready_for_upload/*/
+!Ready_for_upload/template_1/

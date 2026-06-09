@@ -1,0 +1,17 @@
+# Core
+python-dotenv>=1.0        # load .env
+PyYAML>=6.0               # story frontmatter
+
+# Stage 1 — story sourcing
+requests>=2.31            # reddit public json scraping
+# LLM story generation uses the Claude Code CLI (`claude -p`), not an API package —
+# no key required. Install Claude Code separately and make sure `claude` is on PATH.
+
+# Stage 2 — voiceover (default TTS, free, no key, emits word boundaries)
+edge-tts>=6.1
+
+# Optional providers (uncomment as needed):
+# piper-tts               # local offline TTS
+# openai-whisper          # forced alignment fallback for timings
+
+# ffmpeg must be installed separately and available on PATH.

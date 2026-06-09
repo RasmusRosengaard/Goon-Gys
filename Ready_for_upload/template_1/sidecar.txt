@@ -1,0 +1,11 @@
+title:          # Hook-y Short title, <=100 chars; series parts get a (Part X/N) suffix
+description:     # 1-3 lines; first line is the hook. Plain text. Series parts tease the next.
+pinned_comment:  # author comment to pin under the video — a question that invites replies
+tags:           # comma-separated, e.g. horror, scarystory, storytime, shorts
+theme:          # horror | goon | goonhorror
+series_id:      # blank for standalone; shared id across a series' parts
+part:           # blank for standalone, else X/N
+story_id:       # matches Stories/<id>.md and this folder name
+hashtags:       # space-separated, e.g. #shorts #horror #storytime
+language:       # en
+visibility:     # public | unlisted | private

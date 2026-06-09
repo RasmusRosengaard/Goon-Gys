@@ -1,0 +1,58 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 1000" width="1000" height="1000" role="img" aria-label="Past Midnight">
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="36%" r="78%">
+      <stop offset="0%" stop-color="#1c2552"/>
+      <stop offset="55%" stop-color="#0b1026"/>
+      <stop offset="100%" stop-color="#04050d"/>
+    </radialGradient>
+    <linearGradient id="ink" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#f3f5ff"/>
+      <stop offset="100%" stop-color="#c3cbf0"/>
+    </linearGradient>
+    <mask id="moon">
+      <rect width="1000" height="1000" fill="black"/>
+      <circle cx="372" cy="250" r="92" fill="white"/>
+      <circle cx="410" cy="228" r="84" fill="black"/>
+    </mask>
+  </defs>
+
+  <!-- backdrop -->
+  <circle cx="500" cy="500" r="500" fill="url(#bg)"/>
+  <circle cx="500" cy="500" r="478" fill="none" stroke="#33407e" stroke-width="5" opacity="0.65"/>
+
+  <!-- stars -->
+  <g fill="#dfe5ff">
+    <circle cx="640" cy="210" r="5" opacity="0.9"/>
+    <circle cx="708" cy="300" r="3.5" opacity="0.7"/>
+    <circle cx="300" cy="360" r="3" opacity="0.6"/>
+    <circle cx="760" cy="430" r="4" opacity="0.55"/>
+    <circle cx="250" cy="470" r="3.5" opacity="0.5"/>
+    <circle cx="690" cy="150" r="3" opacity="0.6"/>
+  </g>
+
+  <!-- crescent moon, upper-left mood accent -->
+  <rect width="1000" height="1000" fill="#eef0e2" mask="url(#moon)" opacity="0.95"/>
+
+  <!-- clock: just past midnight -->
+  <g transform="translate(500,440)">
+    <circle r="172" fill="#0a0f24" stroke="url(#ink)" stroke-width="9"/>
+    <!-- quarter ticks -->
+    <g stroke="url(#ink)" stroke-width="9" stroke-linecap="round">
+      <line x1="0" y1="-150" x2="0" y2="-122"/>
+      <line x1="150" y1="0" x2="122" y2="0"/>
+      <line x1="0" y1="150" x2="0" y2="122"/>
+      <line x1="-150" y1="0" x2="-122" y2="0"/>
+    </g>
+    <!-- hour hand at 12 -->
+    <line x1="0" y1="0" x2="0" y2="-96" stroke="url(#ink)" stroke-width="14" stroke-linecap="round"/>
+    <!-- minute hand just past the hour (~12:08), red accent -->
+    <line x1="0" y1="0" x2="118" y2="-78" stroke="#c0273c" stroke-width="11" stroke-linecap="round"/>
+    <circle r="13" fill="#c0273c"/>
+  </g>
+
+  <!-- wordmark -->
+  <g fill="url(#ink)" text-anchor="middle" font-family="'Arial Black', 'Helvetica Neue', Arial, sans-serif" font-weight="900">
+    <text x="500" y="730" font-size="104" letter-spacing="14">PAST</text>
+    <text x="500" y="838" font-size="104" letter-spacing="6">MIDNIGHT</text>
+  </g>
+</svg>
