@@ -28,6 +28,15 @@ _EMPTY_MCP = '{"mcpServers":{}}'
 # Our prompts are fully self-contained, so they need none of it.
 _SCRATCH = os.path.join(tempfile.gettempdir(), "goonandgys_claude_scratch")
 
+# Single-line replacement system prompt (multi-line ones get truncated — see
+# complete()). The real instructions ride in the user message as the BRIEF block.
+_ROLE = (
+    "You are a writing engine for YouTube Shorts scripts. The user message starts "
+    "with a BRIEF that is your complete instruction set: follow it exactly, treat "
+    "its constraints as hard requirements, and output ONLY what the brief asks for "
+    "in exactly the format it specifies — no preamble, no commentary."
+)
+
 
 def available() -> bool:
     return shutil.which("claude") is not None
@@ -42,8 +51,15 @@ def complete(
 ) -> str:
     """Send a prompt to the Claude CLI and return its text response.
 
-    The user prompt is piped over stdin to avoid shell-escaping/length limits;
-    the system prompt is appended via --append-system-prompt.
+    CRITICAL plumbing detail (verified empirically on CLI 2.1.170 / Windows): a
+    multi-paragraph system prompt passed via --system-prompt / --append-system-prompt
+    / --system-prompt-file is TRUNCATED AT THE FIRST BLANK LINE — the model only ever
+    received the first paragraph of our craft rules, which is exactly where 'mid'
+    scripts (and prose replies to JSON-only instructions) came from. Stdin, however,
+    arrives fully intact. So: the entire multi-paragraph brief is sent as a BRIEF
+    block at the top of the stdin user message, and --system-prompt carries only a
+    SINGLE-LINE role (which both survives the bug and replaces Claude Code's huge
+    default agent prompt — thousands of input tokens saved per call).
     """
     exe = shutil.which("claude")
     if not exe:
@@ -52,7 +68,8 @@ def complete(
     cmd = [exe, "-p", "--output-format", "text",
            "--mcp-config", _EMPTY_MCP, "--strict-mcp-config"]
     if system:
-        cmd += ["--append-system-prompt", system]
+        cmd += ["--system-prompt", _ROLE]
+        user = f"YOUR BRIEF (follow it exactly):\n\n{system}\n\n=== TASK ===\n\n{user}"
     if model:
         cmd += ["--model", model]
 
@@ -95,13 +112,23 @@ def complete_json(
     *,
     model: str | None = DEFAULT_MODEL,
     timeout: int = 240,
-    retries: int = 1,
+    retries: int = 2,
 ) -> dict:
-    """Like complete(), but require a JSON object back — retrying once if the model
-    happens to reply with prose instead of JSON."""
+    """Like complete(), but require a JSON object back. The JSON demand lives in the
+    system prompt, but with strongly creative user prompts the model often ignores it
+    and answers in prose — so the demand is re-anchored at the END of the user prompt
+    on every attempt (and escalated on retries), which reliably wins."""
+    tail = (
+        "\n\nFORMAT: reply with ONLY the single valid JSON object your instructions "
+        "describe — no prose, no code fences, nothing before or after it."
+    )
     last_err: Exception | None = None
-    for _ in range(retries + 1):
-        text = complete(user, system, model=model, timeout=timeout)
+    for attempt in range(retries + 1):
+        u = user + tail if attempt == 0 else (
+            "IMPORTANT: your previous reply was not valid JSON. This time output "
+            "ONLY the JSON object — start your reply with '{'.\n\n" + user + tail
+        )
+        text = complete(u, system, model=model, timeout=timeout)
         try:
             return extract_json(text)
         except (ValueError, json.JSONDecodeError) as e:

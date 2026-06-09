@@ -10,18 +10,18 @@ import datetime
 from .. import config
 from ..claude_cli import available
 from ..models import Story
-from . import ids, llm, reddit
+from . import critic, ids, llm, reddit
 
 _SEED_OPTS = ("subreddit", "min_chars", "max_chars")
 
 
-def generate(theme: str, **opts) -> Story:
+def generate(theme: str, *, polish: bool = True, **opts) -> Story:
     title, body, url = reddit.fetch_seed(
         theme, **{k: v for k, v in opts.items() if k in _SEED_OPTS}
     )
     if available():
         body = llm.reshape(title, body, theme)
-    return Story(
+    story = Story(
         id=ids.make_id(theme, title),
         title=title,
         body=body,
@@ -32,3 +32,9 @@ def generate(theme: str, **opts) -> Story:
         voice=config.DEFAULT_VOICE,
         created=datetime.date.today().isoformat(),
     )
+    if polish and available():
+        # Quality gate: score + punch up the reshape. Also fills description/tags/
+        # pinned_comment, so Stage 5 needs no Claude call for polished hybrids.
+        critic.polish(story)
+        story.id = ids.make_id(theme, story.title)
+    return story

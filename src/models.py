@@ -40,6 +40,10 @@ class Story:
     # An author/channel comment to pin under the video — a question that invites viewers
     # to reply, driving engagement. Precomputed with the story (llm) or filled by Stage 5.
     pinned_comment: str = ""
+    # Quality gate (src/story/critic.py): the critic's harsh 0-10 score of the polished
+    # script and its one-line notes. 0 = never judged (reddit faithful / --no-polish).
+    quality: float = 0.0
+    quality_notes: str = ""
     # Multi-part series. Standalone shorts use part=0, total_parts=1, series_id="".
     # A series of N parts shares one series_id; parts are numbered 1..N.
     series_id: str = ""

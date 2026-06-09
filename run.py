@@ -31,6 +31,7 @@ for _stream in (sys.stdout, sys.stderr):
         pass
 
 from src import config, story as story_stage, voice, subtitles, assemble, sidecar
+from src.story.critic import MIN_SCORE
 from src.story.series import part_id
 from src.storyfile import (
     load_story, save_story, load_word_timings, save_word_timings, story_path,
@@ -78,7 +79,10 @@ def cmd_story(args) -> list[str]:
     used: set[str] = set()
     ids = []
     for _ in range(count):
-        stories = story_stage.generate_series(args.source, args.theme, parts)
+        stories = story_stage.generate_series(
+            args.source, args.theme, parts,
+            polish=not getattr(args, "no_polish", False),
+        )
         _ensure_unique(stories, used)
         for s in stories:
             if args.voice:
@@ -88,6 +92,11 @@ def cmd_story(args) -> list[str]:
             save_story(s)
             tag = f" [part {s.part}/{s.total_parts}]" if s.is_series else ""
             print(f"[story] {s.id}  ({s.source}/{s.theme}){tag}  \"{s.title}\"")
+            if s.quality:
+                flag = "" if s.quality >= MIN_SCORE else "  ⚠ below bar — consider re-running"
+                print(f"        quality: {s.quality:g}/10{flag}")
+                if s.quality_notes:
+                    print(f"        editor: {s.quality_notes}")
             print(f"        edit: {story_path(s.id)}  (before rendering)")
             ids.append(s.id)
     return ids
@@ -175,7 +184,8 @@ def _confirm_render(sid: str, assume_yes: bool) -> bool:
         print(f"[review] edit {path} if you like, then:  python run.py render {sid}")
         return False
     s = load_story(sid)
-    print(f"\n--- script: {sid} ---\n{s.body}\n--- file: {path} ---")
+    q = f"  (quality {s.quality:g}/10)" if s.quality else ""
+    print(f"\n--- script: {sid}{q} ---\n{s.body}\n--- file: {path} ---")
     resp = input("Edit that file if needed, then render this video? [y/N] ").strip().lower()
     if resp not in ("y", "yes"):
         print(f"[skip] {sid} (not rendered)")
@@ -247,6 +257,10 @@ def build_parser() -> argparse.ArgumentParser:
                              "the parts of one story are a connected series")
         sp.add_argument("--voice", default=None)
         sp.add_argument("--background", default=None)
+        sp.add_argument("--no-polish", action="store_true",
+                        help="skip the quality gate (critic score + punch-up); "
+                             "faster and fewer Claude calls, but no score and more "
+                             "'mid' scripts slip through")
         sp.add_argument("--yes", "-y", action="store_true",
                         help="skip the per-video review/confirm gate and render straight away")
 

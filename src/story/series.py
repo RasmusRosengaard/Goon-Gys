@@ -14,7 +14,7 @@ import re
 from .. import config
 from ..claude_cli import available, complete_json
 from ..models import Story
-from . import ids, reddit
+from . import critic, ids, reddit, variety
 
 # Spoken call-to-action appended to every non-final part so the voiceover literally
 # says it and the subtitles show it (keeps captions == spoken words). {n} = next part.
@@ -112,7 +112,7 @@ def _prompt(parts: int, theme: str, seed: str | None) -> str:
     source_line = (
         f"Base it on this true story, keeping the events:\n\n{seed}\n\n"
         if seed
-        else f"Invent an original {theme} story.\n\n"
+        else f"Invent an original {theme} story.{variety.avoid_clause(theme)}\n\n"
     )
     tease = {"goon": _GOON_SERIES, "goonhorror": _GOONHORROR_SERIES}.get(theme, "")
     return (
@@ -174,6 +174,14 @@ def generate_series(source: str, theme: str, parts: int, **opts) -> list[Story]:
     if len(bodies) != parts:
         # tolerate the model returning a slightly different count
         parts = len(bodies)
+
+    # Quality gate: one critic call scores + punches up the whole series at once
+    # (keeping the part count and cliffhangers). No-op without the CLI.
+    quality, quality_notes = 0.0, ""
+    if opts.get("polish", True):
+        series_title, bodies, quality, quality_notes = critic.polish_series(
+            series_title, bodies, theme
+        )
     series_id = ids.make_id(theme, series_title or f"{theme} series")
     today = datetime.date.today().isoformat()
     source_url = opts.get("_source_url", "")
@@ -196,6 +204,8 @@ def generate_series(source: str, theme: str, parts: int, **opts) -> list[Story]:
                 series_id=series_id,
                 part=i,
                 total_parts=parts,
+                quality=quality,
+                quality_notes=quality_notes,
             )
         )
     return stories

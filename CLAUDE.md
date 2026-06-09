@@ -111,14 +111,49 @@ Pluggable providers behind a common interface, selected by `--source`:
 - **`llm`** — fully original from the theme prompt, no Reddit (`llm.generate`).
 
 `llm.generate` makes **one** Claude call that returns the story **plus** its title,
-description and tags as JSON (`_GEN_SYSTEM`), so a standalone `llm` short costs a
-single Claude invocation across Stages 1+5 (the metadata is stored on the `Story` and
-reused by Stage 5). `rewrite`/`reshape` still return plain spoken text.
+description and tags as JSON (`_GEN_SYSTEM`); the metadata is stored on the `Story` and
+reused by Stage 5. `rewrite`/`reshape` still return plain spoken text.
+
+**Quality gate (`src/story/critic.py`) — default on, skip with `--no-polish`.** Raw
+single-shot drafts were often "mid", so every transformative story (llm / hybrid /
+series) now passes through a critic pass before it is saved:
+- One extra Claude call: a harsh "script doctor" scores the draft 0–10 on hook,
+  substance, escalation, payoff, clarity and delivery (5 = mid, 7 = good, 9+ = viral
+  bet), **rewrites it to fix every weakness**, and re-syncs title/description/tags/
+  pinned_comment to the revised script (so polished hybrids also need no Stage 5 call).
+- The score + one-line notes land in frontmatter (`quality`, `quality_notes`) and are
+  printed at the review gate, so weak scripts are visible before rendering.
+- `llm.generate` enforces a bar: if even the polished script scores below
+  `critic.MIN_SCORE` (7.5), it regenerates from scratch — feeding the editor's
+  rejection notes into the retry prompt — up to `attempts` (2) times, keeping the
+  best-scoring candidate. Series get one whole-series polish call (keeps part count
+  and cliffhangers) but no regen loop.
+- A rewrite that breaks the ~60s format (word-count sanity bounds) is discarded and
+  the original body kept; without the `claude` CLI the gate is a no-op (`quality: 0`).
+- Cost: a polished llm short = 2 Claude calls (up to 4 if a draft is rejected);
+  `--no-polish` restores the old 1-call behavior. `reddit` (faithful) is never polished.
+
+**Variety memory (`src/story/variety.py`).** Each CLI call is memoryless, so
+generation used to drift back to the same stock premises. `llm.generate` and original
+series prompts now append the titles + opening lines of the ~12 most recent same-theme
+`Stories/*.md` with an instruction to differ from all of them in premise, setting,
+cast, and opening.
 
 All LLM work goes through the **Claude Code CLI** (`src/claude_cli.py` → `claude -p`); no key.
 Each call is made with `--strict-mcp-config` + an empty MCP config and from an empty
 scratch cwd, so the headless CLI does **not** load this project's `claude.md`, skills,
 or any MCP servers as input-token overhead. Keep prompts self-contained so this holds.
+
+> **CLI system-prompt bug (do not regress this):** on CLI 2.1.170/Windows, a
+> multi-paragraph system prompt passed via `--system-prompt` /
+> `--append-system-prompt` / `--system-prompt-file` is **truncated at the first
+> blank line** — for months the model received only the first paragraph of the craft
+> rules, which is where "mid" scripts came from. `claude_cli.complete` therefore
+> sends the full multi-paragraph brief **inside the stdin user message** (a `BRIEF`
+> block, stdin arrives intact) and passes only a single-line role via
+> `--system-prompt` (survives the bug + replaces Claude Code's huge default agent
+> prompt, saving thousands of input tokens per call). `complete_json` additionally
+> re-anchors the JSON-only demand at the end of the user prompt on every attempt.
 
 > **Reddit access:** the public `.json` endpoints are **403 / hard-blocked** for
 > unauthenticated requests, so `src/story/reddit.py` instead scrapes the still-served
@@ -176,8 +211,9 @@ Generate `Ready_for_upload/<id>/sidecar.txt` from the story. Format defined in
 **Token note:** for `--source llm`, the description/tags are produced *in the same
 single Claude call as the story* (Stage 1 — see below) and stored on the `Story`
 (`description`/`tags` frontmatter). Stage 5 reuses them and makes **no** Claude call.
-It only falls back to its own `_llm_meta` call when those fields are empty (reddit/
-hybrid stories, which don't precompute them).
+It only falls back to its own `_llm_meta` call when those fields are empty (reddit
+stories, un-polished hybrids, and series parts — the critic pass fills them for
+polished standalone llm/hybrid stories).
 
 ## 4a. Multi-part series (`src/story/series.py`)
 A **series** is one story split into N parts, each rendered as its own Short to "edge"
@@ -244,6 +280,8 @@ Therefore series parts must be assembled in order (1 before 2 …). ffmpeg seeks
 - [x] Stage 4 — ffmpeg assemble to 1080×1920
 - [x] Stage 5 — Sidecar metadata
 - [x] Multi-part series (`--parts N`, cliffhangers)
+- [x] Quality gate — critic score + punch-up + regen-below-bar (`src/story/critic.py`)
+- [x] Variety memory — recent premises fed back to avoid repeats (`src/story/variety.py`)
 - [x] Orchestrator / CLI tying stages 1→5 together (`run.py`)
 - [x] `requirements.txt` + `.env.example`
 

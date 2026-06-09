@@ -11,7 +11,7 @@ import datetime
 from .. import config
 from ..claude_cli import complete, complete_json
 from ..models import Story
-from . import ids
+from . import critic, ids, variety
 
 # Shared craft rules. _SYSTEM (plain-text body) wraps these for rewrite()/reshape();
 # _GEN_SYSTEM (JSON) wraps them for generate(), which returns story + metadata in one call.
@@ -162,10 +162,7 @@ def _gen_json(user: str) -> dict:
     return complete_json(user, _GEN_SYSTEM)
 
 
-def generate(theme: str, *, prompt: str | None = None, **_) -> Story:
-    if theme not in _THEME_PROMPT:
-        raise ValueError(f"no llm prompt for theme '{theme}'")
-    data = _gen_json(prompt or _THEME_PROMPT[theme])
+def _build_story(theme: str, data: dict) -> Story:
     title = (data.get("title") or "").strip().strip('"') or theme.title()
     return Story(
         id=ids.make_id(theme, title),
@@ -180,6 +177,42 @@ def generate(theme: str, *, prompt: str | None = None, **_) -> Story:
         tags=(data.get("tags") or "").strip(),
         pinned_comment=(data.get("pinned_comment") or "").strip(),
     )
+
+
+def generate(
+    theme: str, *, prompt: str | None = None, polish: bool = True, attempts: int = 2, **_
+) -> Story:
+    """Write an original story; with `polish` (default) every draft passes the
+    quality gate (critic score + punch-up), and a draft that still scores below
+    critic.MIN_SCORE is thrown away and regenerated — the editor's notes are fed
+    back into the retry prompt — keeping the best attempt as a fallback."""
+    if theme not in _THEME_PROMPT:
+        raise ValueError(f"no llm prompt for theme '{theme}'")
+    base = (prompt or _THEME_PROMPT[theme]) + variety.avoid_clause(theme)
+
+    best: Story | None = None
+    feedback = ""
+    for _attempt in range(max(1, attempts) if polish else 1):
+        story = _build_story(theme, _gen_json(base + feedback))
+        if not story.body:
+            continue  # malformed reply (e.g. JSON missing "body") — never save it
+        if not polish:
+            return story
+        critic.polish(story)
+        story.id = ids.make_id(theme, story.title)  # title may have been sharpened
+        if story.quality <= 0 or story.quality >= critic.MIN_SCORE:
+            return story  # accepted — or no CLI to judge with, so take the draft
+        if best is None or story.quality > best.quality:
+            best = story
+        feedback = (
+            "\n\nA previous draft was REJECTED by the channel's editor with these "
+            f"notes: {story.quality_notes or 'flat, forgettable, weak payoff'}. "
+            "Write a COMPLETELY different story — new premise, setting, and cast — "
+            "that cannot fail the same way."
+        )
+    if best is None:
+        raise RuntimeError("the model returned no usable story body")
+    return best
 
 
 def rewrite(title: str, body: str, theme: str) -> str:

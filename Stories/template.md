@@ -9,6 +9,8 @@ status:             # draft | voiced | rendered | uploaded
 created:            # YYYY-MM-DD
 description:        # upload description, precomputed with the story for source=llm (else blank)
 tags:               # comma-separated upload tags, precomputed for source=llm (else blank)
+quality:            # critic's harsh 0-10 score of the script (0 = never judged)
+quality_notes:      # critic's one-line notes on what was weak / what it changed
 series_id:          # blank for standalone; shared id for all parts of a series
 part:               # 0 for standalone, else 1..N
 total_parts:        # 1 for standalone, else N
